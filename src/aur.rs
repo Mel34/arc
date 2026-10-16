@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::time::Duration;
 
 const USER_AGENT: &str = "arc-tui/0.1.0 (aur-commander)";
@@ -51,23 +52,63 @@ impl AurClient {
         Self { agent }
     }
 
+    /// Smart search prioritizing Exact Name match, querying package names only (?by=name)
     pub fn search(&self, query: &str) -> Result<Vec<AurPackage>> {
-        if query.trim().is_empty() {
+        let q = query.trim();
+        if q.is_empty() {
             return Ok(Vec::new());
         }
 
-        let url = format!("{}/search/{}", AUR_RPC_URL, query.trim());
-        let response: AurRpcResponse = self
-            .agent
-            .get(&url)
-            .call()
-            .context("Failed to communicate with AUR RPC")?
-            .into_json()
-            .context("Failed to parse AUR RPC response JSON")?;
+        let mut results_map: HashMap<String, AurPackage> = HashMap::new();
 
-        let mut results = response.results;
-        // Sort A-Z by package name
-        results.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        // 1. Exact Name match via /info (works for 1-char like 's', 'f', and exact package names)
+        let info_url = format!("{}/info?arg[]={}", AUR_RPC_URL, q);
+        if let Ok(resp) = self.agent.get(&info_url).call() {
+            if let Ok(info_res) = resp.into_json::<AurRpcResponse>() {
+                for pkg in info_res.results {
+                    results_map.insert(pkg.name.clone(), pkg);
+                }
+            }
+        }
+
+        // 2. Search by package name only (?by=name), completely ignoring descriptions
+        if q.chars().count() >= 2 {
+            let search_url = format!("{}/search/{}?by=name", AUR_RPC_URL, q);
+            if let Ok(resp) = self.agent.get(&search_url).call() {
+                if let Ok(search_res) = resp.into_json::<AurRpcResponse>() {
+                    for pkg in search_res.results {
+                        results_map.entry(pkg.name.clone()).or_insert(pkg);
+                    }
+                }
+            }
+        }
+
+        let mut results: Vec<AurPackage> = results_map.into_values().collect();
+
+        // 3. Relevance Ranking:
+        // Rank 1: Exact match (e.g. 'aurutils' == 'aurutils')
+        // Rank 2: Starts with query (e.g. 'aurutils-git')
+        // Rank 3: Alphabetical A-Z
+        let q_lower = q.to_lowercase();
+        results.sort_by(|a, b| {
+            let a_lower = a.name.to_lowercase();
+            let b_lower = b.name.to_lowercase();
+
+            let a_exact = a_lower == q_lower;
+            let b_exact = b_lower == q_lower;
+            if a_exact != b_exact {
+                return b_exact.cmp(&a_exact);
+            }
+
+            let a_starts = a_lower.starts_with(&q_lower);
+            let b_starts = b_lower.starts_with(&q_lower);
+            if a_starts != b_starts {
+                return b_starts.cmp(&a_starts);
+            }
+
+            a_lower.cmp(&b_lower)
+        });
+
         Ok(results)
     }
 
