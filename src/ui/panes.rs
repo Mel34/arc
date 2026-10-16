@@ -85,9 +85,9 @@ pub fn draw_panes(f: &mut Frame, left_area: Rect, right_area: Rect, app: &App) {
 fn draw_left_pane(f: &mut Frame, area: Rect, app: &App) {
     let is_active = app.active_pane == ActivePane::Left;
     let border_style = if is_active {
-        Style::default().fg(NC_CYAN)
-    } else {
         Style::default().fg(NC_WHITE)
+    } else {
+        Style::default().fg(NC_CYAN)
     };
 
     let title_line = Line::from(vec![
@@ -246,9 +246,9 @@ fn draw_left_pane(f: &mut Frame, area: Rect, app: &App) {
 fn draw_right_pane(f: &mut Frame, area: Rect, app: &App) {
     let is_active = app.active_pane == ActivePane::Right;
     let border_style = if is_active {
-        Style::default().fg(NC_CYAN)
-    } else {
         Style::default().fg(NC_WHITE)
+    } else {
+        Style::default().fg(NC_CYAN)
     };
 
     let title_line = Line::from(vec![
