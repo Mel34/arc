@@ -430,6 +430,7 @@ impl App {
         }
 
         let name = pkg_name.to_string();
+        let is_locked = self.locked_pkgs.contains(&name);
         let builder = self.builder.clone();
         let repo_mgr = self.repo_mgr.clone();
 
@@ -446,6 +447,7 @@ impl App {
             let res = builder.build_and_integrate(
                 &name_clone,
                 &repo_mgr,
+                is_locked,
                 clean,
                 &child_pgid_clone,
                 &cancel_clone,
