@@ -208,6 +208,11 @@ impl App {
                 p.aur_update = None;
             }
         }
+        for p in &mut self.local_pkgs {
+            if Self::is_local_source_package(&p.name) {
+                p.aur_update = None;
+            }
+        }
         self.local_tagged.clear();
         if self.local_cursor >= self.local_pkgs.len() && !self.local_pkgs.is_empty() {
             self.local_cursor = self.local_pkgs.len() - 1;
@@ -428,6 +433,20 @@ impl App {
         if let Some(n) = name {
             self.quick_view_title = n.clone();
             self.quick_view_scroll = 0;
+
+            // If viewing left pane and local PKGBUILD exists, read from local disk!
+            if self.active_pane == ActivePane::Left {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                let proj_pkgbuild = PathBuf::from(&home).join("Projects").join(&n).join("PKGBUILD");
+                let cache_pkgbuild = PathBuf::from(&home).join(".cache").join("arc").join("builds").join(&n).join("PKGBUILD");
+
+                if let Ok(content) = fs::read_to_string(&proj_pkgbuild).or_else(|_| fs::read_to_string(&cache_pkgbuild)) {
+                    self.quick_view_content = content.lines().map(|s| s.to_string()).collect();
+                    return;
+                }
+            }
+
+            // Otherwise, fetch from AUR
             match self.aur_client.fetch_pkgbuild(&n) {
                 Ok(content) => {
                     self.quick_view_content = content.lines().map(|s| s.to_string()).collect();
@@ -464,7 +483,7 @@ impl App {
         }
 
         let name = pkg_name.to_string();
-        let is_locked = self.locked_pkgs.contains(&name);
+        let is_local_or_locked = self.locked_pkgs.contains(&name) || Self::is_local_source_package(&name);
         let builder = self.builder.clone();
         let repo_mgr = self.repo_mgr.clone();
 
@@ -481,7 +500,7 @@ impl App {
             let res = builder.build_and_integrate(
                 &name_clone,
                 &repo_mgr,
-                is_locked,
+                is_local_or_locked,
                 clean,
                 &child_pgid_clone,
                 &cancel_clone,
