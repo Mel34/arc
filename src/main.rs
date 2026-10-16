@@ -53,9 +53,18 @@ fn main() -> Result<()> {
     while !app.should_quit {
         terminal.draw(|f| ui::draw_ui(f, &app))?;
 
-        // Debounce timer for live search (400ms)
+        // Adaptive tiered debounce based on query length:
+        // 1 char = 1100ms | 2 chars = 800ms | 3 chars = 500ms | 4+ chars = 280ms
         if let Some(debounce_start) = app.search_debounce {
-            if debounce_start.elapsed() >= Duration::from_millis(400) {
+            let delay = match app.aur_search_query.trim().chars().count() {
+                0 => Duration::from_millis(0),
+                1 => Duration::from_millis(1100),
+                2 => Duration::from_millis(800),
+                3 => Duration::from_millis(500),
+                _ => Duration::from_millis(280),
+            };
+
+            if debounce_start.elapsed() >= delay {
                 app.search_debounce = None;
                 app.trigger_aur_search();
             }
