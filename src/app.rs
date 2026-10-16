@@ -167,6 +167,35 @@ impl App {
         Ok(())
     }
 
+    /// Checks if a package is a homegrown local project or uses local sources (git+file://, file://)
+    pub fn is_local_source_package(pkg_name: &str) -> bool {
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+        let candidates = [
+            PathBuf::from(&home).join("Projects").join(pkg_name).join("PKGBUILD"),
+            PathBuf::from(&home).join(".cache").join("arc").join("builds").join(pkg_name).join("PKGBUILD"),
+        ];
+
+        for path in candidates {
+            if let Ok(content) = fs::read_to_string(&path) {
+                // 1. Resides in ~/Projects/<pkgname>/ -> homegrown project
+                if path.to_string_lossy().contains("/Projects/") {
+                    return true;
+                }
+                // 2. PKGBUILD explicitly uses local file/git sources
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with('#') {
+                        continue;
+                    }
+                    if trimmed.contains("git+file://") || trimmed.contains("file://") {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     pub fn refresh_local(&mut self) -> Result<()> {
         let pacconf = pacmanconf::Config::new().unwrap_or_default();
         if let Ok(fresh_alpm) = Alpm::new(pacconf.root_dir.as_str(), pacconf.db_path.as_str()) {
@@ -174,6 +203,11 @@ impl App {
         }
 
         self.local_pkgs = self.repo_mgr.list_packages(&self.alpm)?;
+        for p in &mut self.local_pkgs {
+            if Self::is_local_source_package(&p.name) {
+                p.aur_update = None;
+            }
+        }
         self.local_tagged.clear();
         if self.local_cursor >= self.local_pkgs.len() && !self.local_pkgs.is_empty() {
             self.local_cursor = self.local_pkgs.len() - 1;
@@ -217,7 +251,7 @@ impl App {
         let local_tuples: Vec<(&str, &str)> = self
             .local_pkgs
             .iter()
-            .filter(|p| !self.locked_pkgs.contains(&p.name))
+            .filter(|p| !self.locked_pkgs.contains(&p.name) && !Self::is_local_source_package(&p.name))
             .map(|p| (p.name.as_str(), p.version.as_str()))
             .collect();
 
@@ -243,7 +277,7 @@ impl App {
         let to_update: Vec<String> = self
             .local_pkgs
             .iter()
-            .filter(|p| p.aur_update.is_some() && !self.locked_pkgs.contains(&p.name))
+            .filter(|p| p.aur_update.is_some() && !self.locked_pkgs.contains(&p.name) && !Self::is_local_source_package(&p.name))
             .map(|p| p.name.clone())
             .collect();
 
