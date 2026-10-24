@@ -153,7 +153,6 @@ impl LocalRepoManager {
 
     pub fn add_package(&self, pkg_path: &Path) -> Result<()> {
         let status = Command::new("repo-add")
-            .arg("-n")
             .arg("-R")
             .arg(&self.db_path)
             .arg(pkg_path)
