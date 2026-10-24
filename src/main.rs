@@ -145,6 +145,7 @@ fn main() -> Result<()> {
                                                 }
                                             }
                                             let _ = app.refresh_local();
+                                            app.check_aur_updates();
                                             app.modal = Some(Modal::Message(format!("Update All Complete!\n\nSuccessfully updated {} package(s).", updated_count)));
                                         }
                                     }

@@ -208,11 +208,6 @@ impl App {
                 p.aur_update = None;
             }
         }
-        for p in &mut self.local_pkgs {
-            if Self::is_local_source_package(&p.name) {
-                p.aur_update = None;
-            }
-        }
         self.local_tagged.clear();
         if self.local_cursor >= self.local_pkgs.len() && !self.local_pkgs.is_empty() {
             self.local_cursor = self.local_pkgs.len() - 1;
@@ -262,6 +257,14 @@ impl App {
 
         match self.aur_client.check_updates(&local_tuples) {
             Ok(updates) => {
+                for pkg in &mut self.local_pkgs {
+                    if !self.locked_pkgs.contains(&pkg.name)
+                        && !Self::is_local_source_package(&pkg.name)
+                    {
+                        pkg.aur_update = None;
+                    }
+                }
+
                 for (name, new_ver) in updates {
                     if let Some(pkg) = self.local_pkgs.iter_mut().find(|p| p.name == name) {
                         pkg.aur_update = Some(new_ver);
