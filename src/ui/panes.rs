@@ -26,6 +26,13 @@ pub fn truncate_middle(s: &str, max_len: usize) -> String {
 }
 
 pub fn clean_version(ver: &str, max_len: usize) -> String {
+    if max_len == 6 {
+        let without_epoch = ver.split_once(':').map_or(ver, |(_, version)| version);
+        let pkgver = without_epoch
+            .rsplit_once('-')
+            .map_or(without_epoch, |(version, _)| version);
+        return pkgver.chars().take(max_len).collect();
+    }
     if ver.chars().count() <= max_len {
         return ver.to_string();
     }
