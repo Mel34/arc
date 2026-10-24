@@ -137,7 +137,7 @@ fn main() -> Result<()> {
                                             let mut updated_count = 0;
                                             for name in targets {
                                                 let was_installed = app.local_pkgs.iter().find(|p| &p.name == name).map(|p| p.is_installed).unwrap_or(false);
-                                                if let Ok(pkg_file) = app.build_and_integrate_package(name, false, &mut terminal) {
+                                                if let Ok(pkg_file) = app.build_and_integrate_package(name, true, &mut terminal) {
                                                     updated_count += 1;
                                                     if was_installed {
                                                         let _ = app.install_archive_via_worker(&pkg_file, &mut terminal);
